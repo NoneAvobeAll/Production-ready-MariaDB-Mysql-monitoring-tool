@@ -15,7 +15,15 @@ HTML_FILE="$REPORT_DIR/db_monitor_$TIMESTAMP.html"
 # ---------------------------
 if [ "$ENABLE_SSH_TUNNEL" = true ]; then
     echo "Setting up SSH tunnel..."
-    ssh -f -N -L $LOCAL_PORT:$MYSQL_HOST:$MYSQL_PORT $SSH_USER@$SSH_HOST -p $SSH_PORT
+
+    # Check if LOCAL_PORT is in use and find an available port
+    while lsof -i:$LOCAL_PORT > /dev/null 2>&1; do
+        echo "Port $LOCAL_PORT is in use. Trying next port..."
+        LOCAL_PORT=$((LOCAL_PORT + 1))
+    done
+
+    # Establish the SSH tunnel using the password
+    sshpass -p "$SSH_PASSWORD" ssh -f -N -L "$LOCAL_PORT:$MYSQL_HOST:$MYSQL_PORT" "$SSH_USER@$SSH_HOST" -p "$SSH_PORT" 2>> ssh_tunnel_error.log
     if [ $? -ne 0 ]; then
         echo "Error: Failed to establish SSH tunnel. Exiting."
         exit 1
@@ -70,9 +78,8 @@ ORDER BY TIME DESC;
 # ---------------------------
 BUFFER_POOL=$(mysql -u$MYSQL_USER -p$MYSQL_PASS -h$MYSQL_HOST -P$MYSQL_PORT -sN -e "
 SELECT POOL_ID, POOL_SIZE, FREE_BUFFERS, DATABASE_PAGES, OLD_DATABASE_PAGES,
-       MODIFIED_DB_PAGES, PENDING_READS, PENDING_WRITES, PAGE_HITS
-FROM information_schema.INNODB_BUFFER_POOL_STATS;
-")
+       PENDING_READS
+FROM information_schema.INNODB_BUFFER_POOL_STATS;")
 
 # ---------------------------
 # Collect locks & waits
@@ -117,6 +124,7 @@ cat <<EOF > $HTML_FILE
 <html>
 <head>
     <title>MariaDB Monitor Report - $TIMESTAMP</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -144,6 +152,10 @@ cat <<EOF > $HTML_FILE
             color: #e74c3c;
             font-weight: bold;
         }
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
     </style>
 </head>
 <body>
@@ -164,6 +176,69 @@ cat <<EOF > $HTML_FILE
 
     <h3>Transaction Locks & Waits:</h3>
     <pre>$LOCKS</pre>
+
+    <h3>Trend Graphs:</h3>
+    <canvas id="tempTablesChart"></canvas>
+    <canvas id="memoryUsageChart"></canvas>
+    <canvas id="longQueriesChart"></canvas>
+
+    <script>
+        const tempTablesData = {
+            labels: ['Temp Disk Tables'],
+            datasets: [{
+                label: 'Temp Tables Spilled to Disk',
+                data: [$TMP_DISK],
+                backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                borderColor: 'rgba(231, 76, 60, 1)',
+                borderWidth: 1
+            }]
+        };
+
+        const memoryUsageData = {
+            labels: $TOP_MEMORY.split('\n').map(row => row.split(' ')[0]),
+            datasets: [{
+                label: 'Memory Usage (MB)',
+                data: $TOP_MEMORY.split('\n').map(row => parseFloat(row.split(' ')[2])),
+                backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                borderColor: 'rgba(52, 152, 219, 1)',
+                borderWidth: 1
+            }]
+        };
+
+        const longQueriesData = {
+            labels: $LONG_QUERIES.split('\n').map(row => row.split(' ')[0]),
+            datasets: [{
+                label: 'Long-Running Queries (Seconds)',
+                data: $LONG_QUERIES.split('\n').map(row => parseInt(row.split(' ')[4])),
+                backgroundColor: 'rgba(46, 204, 113, 0.2)',
+                borderColor: 'rgba(46, 204, 113, 1)',
+                borderWidth: 1
+            }]
+        };
+
+        const config = (ctx, data) => new Chart(ctx, {
+            type: 'bar',
+            data: data,
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Trend Graph'
+                    }
+                }
+            }
+        });
+
+        window.onload = () => {
+            config(document.getElementById('tempTablesChart').getContext('2d'), tempTablesData);
+            config(document.getElementById('memoryUsageChart').getContext('2d'), memoryUsageData);
+            config(document.getElementById('longQueriesChart').getContext('2d'), longQueriesData);
+        };
+    </script>
 </body>
 </html>
 EOF
@@ -186,3 +261,12 @@ while read -r thread memory; do
         ./utils/notify.sh "$MSG"
     fi
 done < <(echo "$TOP_MEMORY" | awk '{print $1, $3}')
+
+# ---------------------------
+# Cleanup SSH Tunnel on Exit
+# ---------------------------
+if [ "$ENABLE_SSH_TUNNEL" = true ] && [ -n "$TUNNEL_PID" ]; then
+    echo "Closing SSH tunnel..."
+    kill $TUNNEL_PID
+    echo "SSH tunnel closed."
+fi

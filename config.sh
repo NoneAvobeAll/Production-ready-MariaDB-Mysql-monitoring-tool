@@ -5,8 +5,8 @@
 
 MYSQL_USER="root"
 MYSQL_PASS="plc-db"
-MYSQL_HOST="192.168.0.10"  # Target MySQL server
-MYSQL_PORT=3308            # Target MySQL server port
+MYSQL_HOST="127.0.0.1"  # Target MySQL server
+MYSQL_PORT=3306            # Target MySQL server port
 
 # Thresholds
 TMP_DISK_THRESHOLD=100          # Temp tables spilled to disk
@@ -24,9 +24,14 @@ TELEGRAM_CHAT_ID="YOUR_TELEGRAM_CHAT_ID"
 # SSH Tunneling Configuration
 ENABLE_SSH_TUNNEL=true
 SSH_USER="sctdev"
-SSH_HOST="your_ssh_host"
+SSH_HOST="192.168.0.10"
 SSH_PORT=22                # Default SSH port
 LOCAL_PORT=3306            # Local port for the tunnel (can be different from MYSQL_PORT)
+SSH_PASSWORD="G2Rt9gVLKOeJVJ46u64kk3r"  # Password for SSH authentication
 
 # Note: MYSQL_PORT is the port of the target MySQL server on the remote host.
 # LOCAL_PORT is the local port used for the SSH tunnel to forward to MYSQL_PORT.
+
+LOG_DIR="/home/abubakkar/Desktop/Scrap/mysqlStatus/logs"
+REPORT_DIR="/home/abubakkar/Desktop/Scrap/mysqlStatus/db_monitor_reports"
+mkdir -p "$LOG_DIR" "$REPORT_DIR"
