@@ -15,12 +15,12 @@ HTML_FILE="$REPORT_DIR/db_monitor_$TIMESTAMP.html"
 # ---------------------------
 if [ "$ENABLE_SSH_TUNNEL" = true ]; then
     echo "Setting up SSH tunnel..."
-    ssh -f -N -L $LOCAL_PORT:$MYSQL_HOST:$MYSQL_PORT $SSH_USER@$SSH_HOST
+    ssh -f -N -L $LOCAL_PORT:$MYSQL_HOST:$MYSQL_PORT $SSH_USER@$SSH_HOST -p $SSH_PORT
     if [ $? -ne 0 ]; then
         echo "Error: Failed to establish SSH tunnel. Exiting."
         exit 1
     fi
-    MYSQL_HOST="127.0.0.1"
+    MYSQL_HOST="127.0.0.1"  # Redirect to local tunnel
     MYSQL_PORT="$LOCAL_PORT"
     echo "SSH tunnel established: localhost:$LOCAL_PORT -> $MYSQL_HOST:$MYSQL_PORT"
 fi

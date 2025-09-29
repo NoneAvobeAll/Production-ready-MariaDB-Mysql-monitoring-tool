@@ -61,17 +61,27 @@ This tool is designed to monitor MariaDB/MySQL databases, providing insights int
 ---
 
 ## Usage
-1. Run the monitoring script:
+### Direct MySQL Access
+1. Ensure `ENABLE_SSH_TUNNEL=false` in `config.sh`.
+2. Set `MYSQL_HOST` and `MYSQL_PORT` to the target database server's address and port.
+3. Run the monitoring script:
    ```bash
    ./db_monitor.sh
    ```
 
-2. View the generated reports:
-   - JSON: `/var/log/db_monitor/`
-   - HTML: `/var/www/html/db_monitor_reports/`
+### Using SSH Tunneling
+1. Set `ENABLE_SSH_TUNNEL=true` in `config.sh`.
+2. Configure `SSH_USER`, `SSH_HOST`, `SSH_PORT`, and `LOCAL_PORT`.
+3. Ensure `MYSQL_HOST` and `MYSQL_PORT` point to the target database server.
+4. Run the monitoring script:
+   ```bash
+   ./db_monitor.sh
+   ```
+   The script will establish an SSH tunnel and redirect MySQL traffic through it.
 
-3. Enable SSH tunneling (if required):
-   - Set `ENABLE_SSH_TUNNEL=true` in `config.sh`.
+### Viewing Reports
+- JSON reports: Located in `/var/log/db_monitor/`
+- HTML reports: Located in `/var/www/html/db_monitor_reports/`
 
 ---
 
@@ -85,7 +95,7 @@ Edit the `config.sh` file to customize the following:
   - Slack: `ENABLE_SLACK`, `SLACK_WEBHOOK_URL`
   - Telegram: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
 - **SSH Tunneling**:
-  - `ENABLE_SSH_TUNNEL`, `SSH_USER`, `SSH_HOST`, `LOCAL_PORT`
+  - `ENABLE_SSH_TUNNEL`, `SSH_USER`, `SSH_HOST`, `SSH_PORT`, `LOCAL_PORT`
 
 ---
 
