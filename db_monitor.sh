@@ -11,6 +11,31 @@ JSON_FILE="$LOG_DIR/db_monitor_$TIMESTAMP.json"
 HTML_FILE="$REPORT_DIR/db_monitor_$TIMESTAMP.html"
 
 # ---------------------------
+# Setup SSH Tunnel (if enabled)
+# ---------------------------
+if [ "$ENABLE_SSH_TUNNEL" = true ]; then
+    echo "Setting up SSH tunnel..."
+    ssh -f -N -L $LOCAL_PORT:$MYSQL_HOST:$MYSQL_PORT $SSH_USER@$SSH_HOST -p $SSH_PORT
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to establish SSH tunnel. Exiting."
+        exit 1
+    fi
+    MYSQL_HOST="127.0.0.1"  # Redirect to local tunnel
+    MYSQL_PORT="$LOCAL_PORT"
+    echo "SSH tunnel established: localhost:$LOCAL_PORT -> $MYSQL_HOST:$MYSQL_PORT"
+fi
+
+# ---------------------------
+# Verify MySQL Connectivity
+# ---------------------------
+echo "Verifying MySQL connectivity..."
+mysql -u$MYSQL_USER -p$MYSQL_PASS -h$MYSQL_HOST -P$MYSQL_PORT -e "SELECT 1;" > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+    echo "Error: Unable to connect to MySQL. Check your credentials and connection settings. Exiting."
+    exit 1
+fi
+
+# ---------------------------
 # Collect global status
 # ---------------------------
 TMP_STATS=$(mysql -u$MYSQL_USER -p$MYSQL_PASS -h$MYSQL_HOST -P$MYSQL_PORT -sN -e "
@@ -90,25 +115,55 @@ jq -n \
 # ---------------------------
 cat <<EOF > $HTML_FILE
 <html>
-<head><title>MariaDB Monitor Report - $TIMESTAMP</title></head>
+<head>
+    <title>MariaDB Monitor Report - $TIMESTAMP</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        h2 {
+            color: #2c3e50;
+        }
+        h3 {
+            color: #34495e;
+            border-bottom: 1px solid #ecf0f1;
+            padding-bottom: 5px;
+        }
+        pre {
+            background: #ecf0f1;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        p {
+            color: #7f8c8d;
+        }
+        .alert {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+    </style>
+</head>
 <body>
-<h2>MariaDB Monitor Report</h2>
-<p><b>Time:</b> $TIMESTAMP</p>
+    <h2>MariaDB Monitor Report</h2>
+    <p><b>Time:</b> $TIMESTAMP</p>
 
-<h3>Temp Tables Spilled to Disk:</h3>
-<p>$TMP_DISK</p>
+    <h3>Temp Tables Spilled to Disk:</h3>
+    <p class="alert">$TMP_DISK</p>
 
-<h3>Top Memory-Consuming Threads:</h3>
-<pre>$TOP_MEMORY</pre>
+    <h3>Top Memory-Consuming Threads:</h3>
+    <pre>$TOP_MEMORY</pre>
 
-<h3>Long-Running Queries:</h3>
-<pre>$LONG_QUERIES</pre>
+    <h3>Long-Running Queries:</h3>
+    <pre>$LONG_QUERIES</pre>
 
-<h3>InnoDB Buffer Pool Stats:</h3>
-<pre>$BUFFER_POOL</pre>
+    <h3>InnoDB Buffer Pool Stats:</h3>
+    <pre>$BUFFER_POOL</pre>
 
-<h3>Transaction Locks & Waits:</h3>
-<pre>$LOCKS</pre>
+    <h3>Transaction Locks & Waits:</h3>
+    <pre>$LOCKS</pre>
 </body>
 </html>
 EOF
