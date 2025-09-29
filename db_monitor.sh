@@ -23,7 +23,7 @@ if [ "$ENABLE_SSH_TUNNEL" = true ]; then
     done
 
     # Establish the SSH tunnel using the password
-    sshpass -p "$SSH_PASSWORD" ssh -f -N -L $LOCAL_PORT:$MYSQL_HOST:$MYSQL_PORT $SSH_USER@$SSH_HOST -p $SSH_PORT
+    sshpass -p "$SSH_PASSWORD" ssh -f -N -L "$LOCAL_PORT:$MYSQL_HOST:$MYSQL_PORT" "$SSH_USER@$SSH_HOST" -p "$SSH_PORT" 2>> ssh_tunnel_error.log
     if [ $? -ne 0 ]; then
         echo "Error: Failed to establish SSH tunnel. Exiting."
         exit 1
